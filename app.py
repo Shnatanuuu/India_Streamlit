@@ -66,8 +66,8 @@ def load_and_process_data(uploaded_file):
         
         # Show column names for verification
         with st.sidebar.expander("🔍 Verify Column Names"):
-            st.write("**Sales Columns:**", list(sales_df.columns))
-            st.write("**Balance Columns:**", list(balance_df.columns))
+            st.write("**Balance Sheet Columns:**", list(balance_df.columns))
+            st.write("**Sales Sheet Columns:**", list(sales_df.columns))
         
         # Function to find column with case-insensitive matching
         def find_column(df, possible_names):
@@ -77,35 +77,39 @@ def load_and_process_data(uploaded_file):
                     return df_cols_upper[name.upper()]
             return None
         
-        # Identify key columns for BALANCE sheet
+        # Identify key columns for BALANCE sheet (based on your structure)
         balance_style_col = find_column(balance_df, ['Style_ID', 'STYLE_ID', 'StyleID'])
         balance_year_col = find_column(balance_df, ['YEAR', 'Year'])
         balance_month_col = find_column(balance_df, ['MONTH', 'Month'])
         balance_qty_col = find_column(balance_df, ['Balance_QTY', 'BALANCE_QTY', 'Balance', 'Qty'])
+        balance_date_col = find_column(balance_df, ['Date', 'DATE'])
         
-        # Identify key columns for SALES sheet
-        sales_style_col = find_column(sales_df, ['Style_ID', 'STYLE_ID', 'StyleID', 'SKU'])
+        # Identify key columns for SALES sheet (based on your structure)
+        sales_style_col = find_column(sales_df, ['Style_ID', 'STYLE_ID', 'StyleID'])
+        sales_sku_col = find_column(sales_df, ['SKU', 'Sku'])
         sales_year_col = find_column(sales_df, ['YEAR', 'Year'])
         sales_month_col = find_column(sales_df, ['MONTH', 'Month'])
         sales_qty_col = find_column(sales_df, ['Qty', 'QTY', 'Quantity', 'Sales_QTY'])
+        sales_date_col = find_column(sales_df, ['Date', 'DATE'])
         
-        # Verify required columns exist
-        required_cols_balance = {
-            'Balance Style': balance_style_col,
-            'Balance Year': balance_year_col,
-            'Balance Month': balance_month_col,
-            'Balance Qty': balance_qty_col
+        # Verify required columns exist for Balance sheet
+        required_balance_cols = {
+            'Style_ID': balance_style_col,
+            'YEAR': balance_year_col,
+            'MONTH': balance_month_col,
+            'Balance_QTY': balance_qty_col
         }
         
-        required_cols_sales = {
-            'Sales Style': sales_style_col,
-            'Sales Year': sales_year_col,
-            'Sales Month': sales_month_col,
-            'Sales Qty': sales_qty_col
+        # Verify required columns exist for Sales sheet
+        required_sales_cols = {
+            'Style_ID': sales_style_col,
+            'YEAR': sales_year_col,
+            'MONTH': sales_month_col,
+            'Qty': sales_qty_col
         }
         
-        missing_balance = [k for k, v in required_cols_balance.items() if v is None]
-        missing_sales = [k for k, v in required_cols_sales.items() if v is None]
+        missing_balance = [k for k, v in required_balance_cols.items() if v is None]
+        missing_sales = [k for k, v in required_sales_cols.items() if v is None]
         
         if missing_balance:
             st.error(f"❌ Missing columns in Balance sheet: {', '.join(missing_balance)}")
@@ -117,7 +121,7 @@ def load_and_process_data(uploaded_file):
             st.info("Available columns: " + ", ".join(sales_df.columns))
             st.stop()
         
-        # Create clean dataframes with standardized names
+        # Create clean BALANCE dataframe with standardized names
         balance_clean = pd.DataFrame({
             'STYLE_ID': balance_df[balance_style_col].astype(str).str.strip(),
             'YEAR': pd.to_numeric(balance_df[balance_year_col], errors='coerce'),
@@ -125,7 +129,14 @@ def load_and_process_data(uploaded_file):
             'BALANCE_QTY': pd.to_numeric(balance_df[balance_qty_col], errors='coerce').fillna(0)
         })
         
-        # Create sales dataframe - use Style_ID if available, otherwise SKU
+        # Add Date column if it exists
+        if balance_date_col:
+            try:
+                balance_clean['BALANCE_DATE'] = pd.to_datetime(balance_df[balance_date_col], errors='coerce')
+            except:
+                balance_clean['BALANCE_DATE'] = None
+        
+        # Create clean SALES dataframe with standardized names
         sales_clean = pd.DataFrame({
             'STYLE_ID': sales_df[sales_style_col].astype(str).str.strip(),
             'YEAR': pd.to_numeric(sales_df[sales_year_col], errors='coerce'),
@@ -133,7 +144,18 @@ def load_and_process_data(uploaded_file):
             'SALES_QTY': pd.to_numeric(sales_df[sales_qty_col], errors='coerce').fillna(0)
         })
         
-        # Add additional columns from sales if they exist
+        # Add SKU column if it exists
+        if sales_sku_col:
+            sales_clean['SKU'] = sales_df[sales_sku_col].astype(str).str.strip()
+        
+        # Add Date column if it exists
+        if sales_date_col:
+            try:
+                sales_clean['SALES_DATE'] = pd.to_datetime(sales_df[sales_date_col], errors='coerce')
+            except:
+                sales_clean['SALES_DATE'] = None
+        
+        # Add additional columns from sales if they exist (based on your structure)
         additional_cols_mapping = {
             'Subcategory': ['Subcategory', 'SUBCATEGORY', 'Sub_Category'],
             'Season': ['Season', 'SEASON'],
@@ -144,8 +166,7 @@ def load_and_process_data(uploaded_file):
             'MRP': ['MRP', 'Mrp'],
             'SP': ['SP', 'Sp', 'Selling_Price'],
             'Size': ['Size', 'SIZE'],
-            'FOB': ['FOB', 'Fob'],
-            'SKU': ['SKU', 'Sku']
+            'FOB': ['FOB', 'Fob']
         }
         
         for standard_name, possible_names in additional_cols_mapping.items():
@@ -162,16 +183,19 @@ def load_and_process_data(uploaded_file):
             agg_dict = {'SALES_QTY': 'sum'}
             for col in sales_clean.columns:
                 if col not in ['STYLE_ID', 'YEAR', 'MONTH', 'SALES_QTY']:
-                    agg_dict[col] = 'first'  # Take first value for categorical columns
+                    # For categorical columns, take first non-null value
+                    agg_dict[col] = 'first'
             
             sales_clean = sales_clean.groupby(['STYLE_ID', 'YEAR', 'MONTH'], as_index=False).agg(agg_dict)
         
-        # Merge data on STYLE_ID, YEAR, MONTH
+        # MERGE DATA on STYLE_ID, YEAR, MONTH (as you requested)
+        st.sidebar.info("🔗 Merging data on: STYLE_ID, YEAR, MONTH")
+        
         merged_df = pd.merge(
             balance_clean,
             sales_clean,
             on=['STYLE_ID', 'YEAR', 'MONTH'],
-            how='left',  # Keep all balance records
+            how='left',  # Keep all balance records (inventory) even if no sales
             suffixes=('_BALANCE', '_SALES')
         )
         
@@ -191,18 +215,49 @@ def load_and_process_data(uploaded_file):
                       10: 'October', 11: 'November', 12: 'December'}
         merged_df['MONTH_NAME'] = merged_df['MONTH'].map(month_names)
         
+        # Add Year-Month column for time series
+        merged_df['YEAR_MONTH'] = merged_df['YEAR'].astype(str) + '-' + merged_df['MONTH'].astype(str).str.zfill(2)
+        
         # Data validation summary
         total_balance = merged_df['BALANCE_QTY'].sum()
         total_sales = merged_df['SALES_QTY'].sum()
         matched_records = len(merged_df[merged_df['SALES_QTY'] > 0])
+        unmatched_records = len(merged_df[merged_df['SALES_QTY'] == 0])
         
         st.sidebar.success(f"""
         **Data Processing Complete:**
         - ✅ Total Balance Qty: {total_balance:,.0f}
         - ✅ Total Sales Qty: {total_sales:,.0f}
-        - ✅ Matched Records: {matched_records:,} of {len(merged_df):,}
-        - ✅ % Sold: {(total_sales/total_balance*100 if total_balance > 0 else 0):.1f}%
+        - ✅ Matched Records: {matched_records:,}
+        - ✅ Products with no sales: {unmatched_records:,}
+        - ✅ Overall % Sold: {(total_sales/total_balance*100 if total_balance > 0 else 0):.1f}%
         """)
+        
+        # Show merge statistics
+        with st.sidebar.expander("🔍 Merge Statistics"):
+            st.write(f"**Join Details:**")
+            st.write(f"- Balance records before merge: {len(balance_clean):,}")
+            st.write(f"- Sales records before merge: {len(sales_clean):,}")
+            st.write(f"- Merged records: {len(merged_df):,}")
+            st.write(f"- Successful matches: {matched_records:,} ({matched_records/len(merged_df)*100:.1f}%)")
+            
+            # Check for Style_ID mismatches
+            balance_styles = set(balance_clean['STYLE_ID'].unique())
+            sales_styles = set(sales_clean['STYLE_ID'].unique())
+            
+            common_styles = balance_styles.intersection(sales_styles)
+            only_in_balance = balance_styles - sales_styles
+            only_in_sales = sales_styles - balance_styles
+            
+            st.write(f"\n**Style_ID Match Analysis:**")
+            st.write(f"- Common Style_IDs: {len(common_styles):,}")
+            st.write(f"- Style_IDs only in Balance: {len(only_in_balance):,}")
+            st.write(f"- Style_IDs only in Sales: {len(only_in_sales):,}")
+            
+            if len(only_in_balance) > 0:
+                st.warning(f"⚠️ {len(only_in_balance):,} products in Balance have no matching sales")
+            if len(only_in_sales) > 0:
+                st.info(f"ℹ️ {len(only_in_sales):,} products in Sales have no matching balance")
         
         return merged_df
         
@@ -267,6 +322,7 @@ if uploaded_file is not None:
         - 📊 Records: {len(filtered_df):,}
         - 📦 Filtered Balance: {filtered_df['BALANCE_QTY'].sum():,.0f}
         - 💰 Filtered Sales: {filtered_df['SALES_QTY'].sum():,.0f}
+        - 📈 Filtered % Sold: {(filtered_df['SALES_QTY'].sum()/filtered_df['BALANCE_QTY'].sum()*100 if filtered_df['BALANCE_QTY'].sum() > 0 else 0):.1f}%
         """)
         
         if len(filtered_df) == 0:
@@ -280,21 +336,79 @@ if uploaded_file is not None:
                 # Group by category
                 grouped = df.groupby(category_col, observed=True).agg({
                     'BALANCE_QTY': 'sum',
-                    'SALES_QTY': 'sum'
+                    'SALES_QTY': 'sum',
+                    'STYLE_ID': 'nunique'  # Count unique products
                 }).reset_index()
                 
-                # Calculate percentage
+                # Calculate percentage sold and average per product
                 grouped['PCT_SOLD'] = np.where(
                     grouped['BALANCE_QTY'] > 0,
                     (grouped['SALES_QTY'] / grouped['BALANCE_QTY']) * 100,
                     0
                 )
                 
+                grouped['AVG_SALES_PER_PRODUCT'] = np.where(
+                    grouped['STYLE_ID'] > 0,
+                    grouped['SALES_QTY'] / grouped['STYLE_ID'],
+                    0
+                )
+                
                 # Sort by sales descending
                 grouped = grouped.sort_values('SALES_QTY', ascending=False)
-                grouped.rename(columns={category_col: category_name}, inplace=True)
+                grouped.rename(columns={category_col: category_name, 'STYLE_ID': 'PRODUCT_COUNT'}, inplace=True)
                 
                 return grouped
+            
+            # Time Series Analysis
+            st.markdown("### 📈 Sales Trend Over Time")
+            
+            # Group by Year-Month
+            time_series = filtered_df.groupby('YEAR_MONTH').agg({
+                'BALANCE_QTY': 'sum',
+                'SALES_QTY': 'sum',
+                'STYLE_ID': 'nunique'
+            }).reset_index()
+            
+            # Calculate percentage
+            time_series['PCT_SOLD'] = np.where(
+                time_series['BALANCE_QTY'] > 0,
+                (time_series['SALES_QTY'] / time_series['BALANCE_QTY']) * 100,
+                0
+            )
+            
+            # Create time series chart
+            fig_time = go.Figure()
+            
+            # Add Sales line
+            fig_time.add_trace(go.Scatter(
+                x=time_series['YEAR_MONTH'],
+                y=time_series['SALES_QTY'],
+                mode='lines+markers',
+                name='Sales Quantity',
+                line=dict(color='#1f77b4', width=3),
+                marker=dict(size=8)
+            ))
+            
+            # Add Balance line
+            fig_time.add_trace(go.Scatter(
+                x=time_series['YEAR_MONTH'],
+                y=time_series['BALANCE_QTY'],
+                mode='lines+markers',
+                name='Inventory Balance',
+                line=dict(color='#ff7f0e', width=3, dash='dash'),
+                marker=dict(size=8)
+            ))
+            
+            fig_time.update_layout(
+                height=400,
+                xaxis_title="Time Period",
+                yaxis_title="Quantity",
+                hovermode='x unified',
+                template='plotly_white',
+                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+            )
+            
+            st.plotly_chart(fig_time, use_container_width=True)
             
             # Identify which categorical columns are available
             available_categories = []
@@ -304,7 +418,8 @@ if uploaded_file is not None:
                 'Color': 'Color',
                 'Brand': 'Brand',
                 'Heel_Type_1': 'Heel Type',
-                'Maketplace': 'Marketplace'
+                'Maketplace': 'Marketplace',
+                'Size': 'Size'
             }
             
             for col, name in category_options.items():
@@ -313,144 +428,141 @@ if uploaded_file is not None:
             
             # Create charts for available categories
             if available_categories:
-                st.markdown("### 📈 Sales Analysis by Category")
+                st.markdown("### 📊 Performance by Category")
                 
-                # Create columns for charts
+                # Create columns for charts (max 3 per row)
                 num_charts = len(available_categories)
-                if num_charts <= 3:
-                    cols = st.columns(num_charts)
-                else:
-                    # First row with 3 columns
-                    cols1 = st.columns(3)
-                    # Second row with remaining columns
-                    remaining = num_charts - 3
-                    cols2 = st.columns(remaining) if remaining > 0 else []
-                    cols = list(cols1) + list(cols2)
+                cols_per_row = 3
+                num_rows = (num_charts + cols_per_row - 1) // cols_per_row
                 
-                # Create charts
-                for idx, (col_name, display_name) in enumerate(available_categories):
-                    if idx < len(cols):
+                for row in range(num_rows):
+                    cols = st.columns(cols_per_row)
+                    start_idx = row * cols_per_row
+                    end_idx = min(start_idx + cols_per_row, num_charts)
+                    
+                    for idx, (col_name, display_name) in enumerate(available_categories[start_idx:end_idx]):
                         with cols[idx]:
                             category_data = analyze_by_category(filtered_df, col_name, display_name)
                             if not category_data.empty:
                                 st.markdown(f"#### {display_name}")
                                 
-                                # Create bar chart
-                                fig = px.bar(category_data, x=display_name, y='SALES_QTY',
+                                # Create bar chart for top 10 categories
+                                top_data = category_data.head(10)
+                                
+                                fig = px.bar(top_data, x=display_name, y='SALES_QTY',
                                            color='SALES_QTY', 
-                                           color_continuous_scale=['#FF6B6B', '#4ECDC4', '#45B7D1'][idx % 3])
+                                           color_continuous_scale='viridis',
+                                           text='SALES_QTY')
+                                
                                 fig.update_traces(
-                                    texttemplate='%{y:.0f}', 
+                                    texttemplate='%{text:.0f}', 
                                     textposition='outside'
                                 )
                                 fig.update_layout(
-                                    height=400,
+                                    height=350,
                                     showlegend=False,
                                     xaxis_title=display_name,
                                     yaxis_title="Sales Quantity",
                                     xaxis={'categoryorder': 'total descending'}
                                 )
                                 
-                                # Add rangeslider if many categories
-                                if len(category_data) > 15:
-                                    fig.update_layout(xaxis_rangeslider_visible=True)
-                                
                                 st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Data table
-                                with st.expander(f"📋 {display_name} Data ({len(category_data)} items)"):
-                                    display_df = category_data[[display_name, 'BALANCE_QTY', 'SALES_QTY', 'PCT_SOLD']].copy()
-                                    display_df.columns = [display_name, 'Inventory Balance', 'Sales Quantity', '% Sold']
-                                    
-                                    st.dataframe(
-                                        display_df.style.format({
-                                            'Inventory Balance': '{:,.0f}',
-                                            'Sales Quantity': '{:,.0f}',
-                                            '% Sold': '{:.1f}%'
-                                        }),
-                                        hide_index=True,
-                                        use_container_width=True
-                                    )
                 
                 st.markdown("---")
             
-            # Special Marketplace Trend Chart (if available)
-            if 'Maketplace' in filtered_df.columns:
-                st.markdown("### 📊 Marketplace Performance Trend")
+            # Detailed Data View
+            st.markdown("### 📋 Detailed Data View")
+            
+            # Column selector for display
+            all_columns = list(filtered_df.columns)
+            default_cols = ['STYLE_ID', 'YEAR', 'MONTH_NAME', 'BALANCE_QTY', 'SALES_QTY', 'PCT_SOLD']
+            
+            # Add available additional columns
+            for col in ['SKU', 'Subcategory', 'Brand', 'Color', 'Maketplace', 'Season']:
+                if col in all_columns and col not in default_cols:
+                    default_cols.append(col)
+            
+            selected_cols = st.multiselect(
+                "Select columns to display:",
+                all_columns,
+                default=default_cols
+            )
+            
+            if selected_cols:
+                # Display data with formatting
+                display_df = filtered_df[selected_cols].copy()
                 
-                marketplace_data = analyze_by_category(filtered_df, 'Maketplace', 'Marketplace')
-                if not marketplace_data.empty:
-                    # Line chart
-                    fig_market = go.Figure()
-                    fig_market.add_trace(go.Scatter(
-                        x=marketplace_data['Marketplace'],
-                        y=marketplace_data['SALES_QTY'],
-                        mode='lines+markers+text',
-                        text=marketplace_data['SALES_QTY'],
-                        textposition="top center",
-                        line=dict(color='#1f77b4', width=3),
-                        marker=dict(size=10, color='#ff7f0e')
-                    ))
-                    
-                    fig_market.update_layout(
-                        height=400,
-                        xaxis_title="Marketplace",
-                        yaxis_title="Total Sales Quantity",
-                        hovermode='x unified',
-                        template='plotly_white',
-                        showlegend=False,
-                        xaxis={'categoryorder': 'total descending'}
-                    )
-                    
-                    fig_market.update_traces(
-                        texttemplate='%{text:.0f}',
-                        textfont=dict(size=12, color='black')
-                    )
-                    
-                    st.plotly_chart(fig_market, use_container_width=True)
-                    
-                    # Marketplace data table
-                    with st.expander(f"📋 Marketplace Data ({len(marketplace_data)} items)"):
-                        display_df = marketplace_data[['Marketplace', 'BALANCE_QTY', 'SALES_QTY', 'PCT_SOLD']].copy()
-                        display_df.columns = ['Marketplace', 'Inventory Balance', 'Sales Quantity', '% Sold']
-                        st.dataframe(
-                            display_df.style.format({
-                                'Inventory Balance': '{:,.0f}',
-                                'Sales Quantity': '{:,.0f}',
-                                '% Sold': '{:.1f}%'
-                            }),
-                            hide_index=True,
-                            use_container_width=True
-                        )
+                # Apply formatting
+                def format_row(row):
+                    if 'PCT_SOLD' in display_df.columns:
+                        if row['PCT_SOLD'] > 100:
+                            return ['background-color: #ffcccc'] * len(row)
+                        elif row['PCT_SOLD'] > 80:
+                            return ['background-color: #ccffcc'] * len(row)
+                    return [''] * len(row)
+                
+                st.dataframe(
+                    display_df.style.apply(format_row, axis=1).format({
+                        'BALANCE_QTY': '{:,.0f}',
+                        'SALES_QTY': '{:,.0f}',
+                        'PCT_SOLD': '{:.1f}%'
+                    }),
+                    hide_index=True,
+                    use_container_width=True,
+                    height=400
+                )
             
             # Data validation section
-            with st.expander("🔍 Data Validation Details"):
-                st.write("**Sample Data (First 10 Rows):**")
-                display_cols = ['STYLE_ID', 'YEAR', 'MONTH', 'BALANCE_QTY', 'SALES_QTY', 'PCT_SOLD']
-                if 'SKU' in filtered_df.columns:
-                    display_cols.insert(1, 'SKU')
-                st.dataframe(filtered_df[display_cols].head(10), use_container_width=True)
+            with st.expander("🔍 Data Validation & Statistics"):
+                col1, col2 = st.columns(2)
                 
-                st.write("**Data Quality Check:**")
-                quality_df = pd.DataFrame({
-                    'Metric': [
-                        'Total Records',
-                        'Unique Style IDs', 
-                        'Records with Sales > 0',
-                        'Average Balance per Product',
-                        'Average Sales per Product',
-                        'Overall % Sold'
-                    ],
-                    'Value': [
-                        len(filtered_df),
-                        filtered_df['STYLE_ID'].nunique(),
-                        (filtered_df['SALES_QTY'] > 0).sum(),
-                        filtered_df['BALANCE_QTY'].mean(),
-                        filtered_df['SALES_QTY'].mean(),
-                        (filtered_df['SALES_QTY'].sum() / filtered_df['BALANCE_QTY'].sum() * 100) if filtered_df['BALANCE_QTY'].sum() > 0 else 0
-                    ]
-                })
-                st.dataframe(quality_df, use_container_width=True)
+                with col1:
+                    st.write("**Data Quality Check:**")
+                    quality_df = pd.DataFrame({
+                        'Metric': [
+                            'Total Records',
+                            'Unique Style IDs', 
+                            'Records with Sales > 0',
+                            'Records with Sales = 0',
+                            'Average Balance per Record',
+                            'Average Sales per Record',
+                            'Max % Sold',
+                            'Min % Sold'
+                        ],
+                        'Value': [
+                            len(filtered_df),
+                            filtered_df['STYLE_ID'].nunique(),
+                            (filtered_df['SALES_QTY'] > 0).sum(),
+                            (filtered_df['SALES_QTY'] == 0).sum(),
+                            filtered_df['BALANCE_QTY'].mean(),
+                            filtered_df['SALES_QTY'].mean(),
+                            filtered_df['PCT_SOLD'].max(),
+                            filtered_df['PCT_SOLD'].min()
+                        ]
+                    })
+                    st.dataframe(quality_df, use_container_width=True)
+                
+                with col2:
+                    st.write("**Top 10 Performing Products:**")
+                    top_products = filtered_df.sort_values('SALES_QTY', ascending=False).head(10)
+                    top_display = top_products[['STYLE_ID', 'BALANCE_QTY', 'SALES_QTY', 'PCT_SOLD']].copy()
+                    if 'SKU' in filtered_df.columns:
+                        top_display['SKU'] = top_products['SKU']
+                    st.dataframe(
+                        top_display.style.format({
+                            'BALANCE_QTY': '{:,.0f}',
+                            'SALES_QTY': '{:,.0f}',
+                            'PCT_SOLD': '{:.1f}%'
+                        }),
+                        hide_index=True,
+                        use_container_width=True
+                    )
+                
+                st.write("**Data Sample (First 20 Rows):**")
+                sample_cols = ['STYLE_ID', 'YEAR', 'MONTH', 'BALANCE_QTY', 'SALES_QTY', 'PCT_SOLD']
+                if 'SKU' in filtered_df.columns:
+                    sample_cols.insert(1, 'SKU')
+                st.dataframe(filtered_df[sample_cols].head(20), use_container_width=True)
                 
     except Exception as e:
         st.error(f"❌ Error: {str(e)}")
@@ -462,17 +574,20 @@ else:
     # Instructions for Excel preparation
     with st.expander("📋 Your Excel File Structure"):
         st.markdown("""
-        ### **Balance Sheet Columns:**
+        ### **Balance Sheet Columns (Required):**
         - `Style_ID` - Product identifier
         - `YEAR` - Balance year (e.g., 2024)
         - `MONTH` - Balance month (1-12)
         - `Balance_QTY` - Available stock quantity
         
-        ### **Sales Sheet Columns:**
-        - `Style_ID` or `SKU` - Product identifier (must match Balance sheet Style_ID)
+        ### **Sales Sheet Columns (Required):**
+        - `Style_ID` - Product identifier (must match Balance sheet Style_ID)
         - `YEAR` - Sales year (e.g., 2024)
         - `MONTH` - Sales month (1-12)
         - `Qty` - Quantity sold
+        
+        ### **Sales Sheet Columns (Optional but useful):**
+        - `SKU` - Additional product identifier
         - `Subcategory` - Product subcategory
         - `Heel_Type 1` - Type of heel
         - `Maketplace` - Selling marketplace
@@ -484,9 +599,15 @@ else:
         - `Size` - Product size
         - `FOB` - Free on Board price
         
+        ### **How the Data is Joined:**
+        1. **Primary Join Keys:** `Style_ID`, `YEAR`, `MONTH`
+        2. **Join Type:** LEFT JOIN (keeps all balance records)
+        3. **Matching Logic:** Exact match on all three columns
+        4. **Missing Sales:** Products with balance but no sales will show 0 sales
+        
         ### **Important Notes:**
-        1. The Style_ID in Balance sheet must match Style_ID in Sales sheet
-        2. If you have SKU in Sales sheet, it will be kept as additional information
-        3. Year and Month columns are used to match sales with balance
-        4. The dashboard will automatically handle any variations in capitalization
+        1. The Style_ID in both sheets must match exactly (case and whitespace handled)
+        2. Year and Month columns must be numeric (1-12 for months)
+        3. The dashboard shows detailed merge statistics in the sidebar
+        4. Products appearing in Sales but not in Balance will not appear in merged results
         """)
