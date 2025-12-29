@@ -184,20 +184,7 @@ def load_and_process_data(uploaded_file):
             0
         )
         
-        # Add a column for sales efficiency classification
-        def classify_sales_percentage(percent):
-            if percent == 0:
-                return 'No Opening Stock'
-            elif percent <= 30:
-                return 'Low (<30%)'
-            elif percent <= 60:
-                return 'Medium (30-60%)'
-            elif percent <= 100:
-                return 'High (60-100%)'
-            else:
-                return 'Very High (>100%)'
-        
-        sales_clean['SALES_EFFICIENCY'] = sales_clean['SALES_PERCENTAGE'].apply(classify_sales_percentage)
+
         
         # Data validation summary
         total_sales = sales_clean['SALES_QTY'].sum()
