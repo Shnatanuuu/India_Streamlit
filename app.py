@@ -253,8 +253,7 @@ if uploaded_file is not None:
             month_num = [k for k, v in month_names_dict.items() if v == selected_month][0]
             filtered_df = filtered_df[filtered_df['MONTH'] == month_num]
         
-        if selected_efficiency != 'All':
-            filtered_df = filtered_df[filtered_df['SALES_EFFICIENCY'] == selected_efficiency]
+
         
         # Display filter summary
         st.sidebar.markdown("---")
