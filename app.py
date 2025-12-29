@@ -191,22 +191,8 @@ if uploaded_file is not None:
         with st.spinner('🔍 Loading and processing data...'):
             df = load_and_process_data(uploaded_file)
         
-        # Display success message
+        # Display success message only
         st.success(f"✅ Data loaded successfully! {len(df):,} records processed")
-        
-        # Data summary metrics - Clean and simple
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            total_sales = df['SALES_QTY'].sum()
-            st.metric("Total Sales", f"{total_sales:,.0f}")
-        with col2:
-            total_opening_stock = df['OPENING_STOCK'].sum()
-            st.metric("Total Opening Stock", f"{total_opening_stock:,.0f}")
-        with col3:
-            st.metric("Unique Products", f"{df['STYLE_ID'].nunique():,.0f}")
-        with col4:
-            avg_monthly_sales = df.groupby(['YEAR', 'MONTH'])['SALES_QTY'].sum().mean()
-            st.metric("Avg Monthly Sales", f"{avg_monthly_sales:,.0f}")
         
         st.markdown("---")
         
@@ -240,8 +226,6 @@ if uploaded_file is not None:
         - 📅 Year: {selected_year}
         - 📆 Month: {selected_month}
         - 📊 Records: {len(filtered_df):,}
-        - 💰 Sales: {filtered_df['SALES_QTY'].sum():,.0f}
-        - 📦 Opening Stock: {filtered_df['OPENING_STOCK'].sum():,.0f}
         """)
         
         if len(filtered_df) == 0:
@@ -265,7 +249,7 @@ if uploaded_file is not None:
                     0
                 )
                 
-                # Sort by Sales Qty descending by default (for better user experience)
+                # Sort by Sales Qty descending by default
                 grouped = grouped.sort_values('SALES_QTY', ascending=False)
                 grouped.rename(columns={group_col: group_name}, inplace=True)
                 
@@ -389,7 +373,7 @@ if uploaded_file is not None:
                                     display_table['Opening Stock'] = display_table['Opening Stock'].apply(lambda x: f"{x:,.0f}")
                                     display_table['Sales %'] = display_table['Sales %'].apply(lambda x: f"{x:.1f}%")
                                     
-                                    # Display table with sorting - Streamlit now supports native sorting
+                                    # Display table with sorting
                                     st.dataframe(
                                         display_table,
                                         hide_index=True,
@@ -401,7 +385,7 @@ if uploaded_file is not None:
                                     total_sales_cat = category_table['Sales Qty'].sum()
                                     total_stock_cat = category_table['Opening Stock'].sum()
                                     
-                                    st.caption(f"**Summary:** Sales: {total_sales_cat:,.0f} | Stock: {total_stock_cat:,.0f}")
+                                    st.caption(f"Total Sales: {total_sales_cat:,.0f} | Total Stock: {total_stock_cat:,.0f}")
                                 else:
                                     st.info(f"No data available for {display_name}")
                                 
@@ -502,7 +486,6 @@ if uploaded_file is not None:
             )
             
             # Default sort by Sales Qty descending
-            default_sort = "Sales Quantity (Highest)"
             product_data = product_data.sort_values('SALES_QTY', ascending=False)
             
             # Sort options
@@ -573,10 +556,8 @@ if uploaded_file is not None:
                 total_sales_all = all_products['Sales Qty'].sum()
                 total_stock_all = all_products['Opening Stock'].sum()
                 
-                st.caption(f"**Summary:** Products: {total_products} | Sales: {total_sales_all:,.0f} | Stock: {total_stock_all:,.0f}")
+                st.caption(f"Total Products: {total_products} | Total Sales: {total_sales_all:,.0f} | Total Stock: {total_stock_all:,.0f}")
                 st.markdown("</div>", unsafe_allow_html=True)
-            
-            st.markdown("---")
             
             # Data validation section
             with st.expander("🔍 Data Validation Details"):
@@ -611,9 +592,6 @@ if uploaded_file is not None:
                         'Unique Products', 
                         'Records with Sales > 0',
                         'Records with Opening Stock > 0',
-                        'Average Sales per Record',
-                        'Average Opening Stock per Record',
-                        'Maximum Sales (Single Record)',
                         'Time Period Covered'
                     ],
                     'Value': [
@@ -621,9 +599,6 @@ if uploaded_file is not None:
                         filtered_df['STYLE_ID'].nunique(),
                         (filtered_df['SALES_QTY'] > 0).sum(),
                         (filtered_df['OPENING_STOCK'] > 0).sum(),
-                        f"{filtered_df['SALES_QTY'].mean():.0f}",
-                        f"{filtered_df['OPENING_STOCK'].mean():.0f}",
-                        f"{filtered_df['SALES_QTY'].max():,.0f}",
                         f"{filtered_df['YEAR'].min()} - {filtered_df['YEAR'].max()}"
                     ]
                 })
