@@ -254,8 +254,7 @@ if uploaded_file is not None:
         selected_month = st.sidebar.selectbox("Select Month", ['All'] + [month_names_dict[m] for m in months if m in month_names_dict])
         
         # Add sales efficiency filter
-        efficiency_options = ['All', 'Very High (>100%)', 'High (60-100%)', 'Medium (30-60%)', 'Low (<30%)', 'No Opening Stock']
-        selected_efficiency = st.sidebar.selectbox("Sales Efficiency", efficiency_options)
+
         
         # Filter data
         filtered_df = df.copy()
