@@ -78,11 +78,7 @@ def load_and_process_data(uploaded_file):
         # Read only sales sheet
         sales_df = pd.read_excel(uploaded_file, sheet_name='Sales')
         
-        # Display raw data info
-        st.sidebar.info(f"""
-        **Raw Data Loaded:**
-        - 📊 Sales Records: {len(sales_df):,}
-        """)
+    
         
         # Clean column names - preserve original case but strip spaces
         def clean_columns(df):
@@ -165,8 +161,7 @@ def load_and_process_data(uploaded_file):
         # Now check for duplicates with the correct subset
         duplicate_check = sales_clean.duplicated(subset=duplicate_subset, keep=False).sum()
         
-        if duplicate_check > 0:
-            st.sidebar.warning(f"⚠️ Found {duplicate_check} duplicate sales records. Aggregating...")
+
             
             # Get list of columns to aggregate
             agg_dict = {'SALES_QTY': 'sum', 'OPENING_STOCK': 'first'}
@@ -210,14 +205,7 @@ def load_and_process_data(uploaded_file):
         total_opening_stock = sales_clean['OPENING_STOCK'].sum()
         avg_sales_percentage = sales_clean[sales_clean['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean()
         
-        st.sidebar.success(f"""
-        **Data Processing Complete:**
-        - ✅ Total Sales Qty: {total_sales:,.0f}
-        - ✅ Total Opening Stock: {total_opening_stock:,.0f}
-        - ✅ Avg Sales %: {avg_sales_percentage:.1f}%
-        - ✅ Unique Products: {sales_clean['STYLE_ID'].nunique():,}
-        - ✅ Time Period: {sales_clean['YEAR'].min()} - {sales_clean['YEAR'].max()}
-        """)
+       
         
         return sales_clean
         
