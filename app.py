@@ -223,9 +223,7 @@ if uploaded_file is not None:
         with col2:
             total_opening_stock = df['OPENING_STOCK'].sum()
             st.metric("Total Opening Stock", f"{total_opening_stock:,.0f}")
-        with col3:
-            avg_sales_percentage = df[df['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean()
-            st.metric("Avg Sales %", f"{avg_sales_percentage:.1f}%" if not pd.isna(avg_sales_percentage) else "N/A")
+  
         with col4:
             st.metric("Unique Products", f"{df['STYLE_ID'].nunique():,.0f}")
         with col5:
@@ -241,12 +239,8 @@ if uploaded_file is not None:
             sales_ratio = (df['SALES_QTY'].sum() / df[df['OPENING_STOCK'] > 0]['OPENING_STOCK'].sum() * 100) \
                 if df[df['OPENING_STOCK'] > 0]['OPENING_STOCK'].sum() > 0 else 0
             st.metric("Overall Sales %", f"{sales_ratio:.1f}%")
-        with col8:
-            high_efficiency = len(df[df['SALES_PERCENTAGE'] > 60])
-            st.metric("High Efficiency (>60%)", f"{high_efficiency:,}")
-        with col9:
-            max_sales_percent = df['SALES_PERCENTAGE'].max()
-            st.metric("Max Sales %", f"{max_sales_percent:.1f}%")
+    
+
         with col10:
             months_covered = df[['YEAR', 'MONTH']].drop_duplicates().shape[0]
             st.metric("Months Covered", f"{months_covered}")
