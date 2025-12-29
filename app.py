@@ -256,17 +256,7 @@ if uploaded_file is not None:
 
         
         # Display filter summary
-        st.sidebar.markdown("---")
-        st.sidebar.info(f"""
-        **Filter Applied:**
-        - 📅 Year: {selected_year}
-        - 📆 Month: {selected_month}
-        - 📈 Efficiency: {selected_efficiency}
-        - 📊 Records: {len(filtered_df):,}
-        - 💰 Sales: {filtered_df['SALES_QTY'].sum():,.0f}
-        - 📦 Opening Stock: {filtered_df['OPENING_STOCK'].sum():,.0f}
-        - 📊 Sales %: {filtered_df[filtered_df['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean():.1f}%
-        """)
+
         
         if len(filtered_df) == 0:
             st.warning("⚠️ No data available for the selected filters.")
