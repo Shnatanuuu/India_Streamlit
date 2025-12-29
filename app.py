@@ -78,8 +78,6 @@ def load_and_process_data(uploaded_file):
         # Read only sales sheet
         sales_df = pd.read_excel(uploaded_file, sheet_name='Sales')
         
-    
-        
         # Clean column names - preserve original case but strip spaces
         def clean_columns(df):
             df.columns = df.columns.astype(str).str.strip()
@@ -161,7 +159,8 @@ def load_and_process_data(uploaded_file):
         # Now check for duplicates with the correct subset
         duplicate_check = sales_clean.duplicated(subset=duplicate_subset, keep=False).sum()
         
-
+        if duplicate_check > 0:
+            st.sidebar.warning(f"⚠️ Found {duplicate_check} duplicate sales records. Aggregating...")
             
             # Get list of columns to aggregate
             agg_dict = {'SALES_QTY': 'sum', 'OPENING_STOCK': 'first'}
@@ -205,8 +204,6 @@ def load_and_process_data(uploaded_file):
         total_opening_stock = sales_clean['OPENING_STOCK'].sum()
         avg_sales_percentage = sales_clean[sales_clean['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean()
         
-       
-        
         return sales_clean
         
     except Exception as e:
@@ -225,21 +222,16 @@ if uploaded_file is not None:
         st.success(f"✅ Data loaded successfully! {len(df):,} records processed")
         
         # Data summary metrics
-        col1, col2, col3, col4 ,col5= st.columns(5)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             total_sales = df['SALES_QTY'].sum()
             st.metric("Total Sales", f"{total_sales:,.0f}")
         with col2:
             total_opening_stock = df['OPENING_STOCK'].sum()
             st.metric("Total Opening Stock", f"{total_opening_stock:,.0f}")
-      
         with col3:
             st.metric("Unique Products", f"{df['STYLE_ID'].nunique():,.0f}")
-        
-  
-       
-    
-        with co4:
+        with col4:
             avg_monthly_sales = df.groupby(['YEAR', 'MONTH'])['SALES_QTY'].sum().mean()
             st.metric("Avg Monthly Sales", f"{avg_monthly_sales:,.0f}")
         with col5:
