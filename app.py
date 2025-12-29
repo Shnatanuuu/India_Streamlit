@@ -60,6 +60,10 @@ st.markdown("""
     .low-percent {
         background-color: #ccffcc;
     }
+    /* Hide Streamlit warning/duplicate messages */
+    .stAlert {
+        display: none;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -85,10 +89,6 @@ def load_and_process_data(uploaded_file):
         
         # Clean column names
         sales_df = clean_columns(sales_df)
-        
-        # Show column names for verification
-        with st.sidebar.expander("🔍 Verify Column Names"):
-            st.write("**Sales Columns:**", list(sales_df.columns))
         
         # Function to find column with case-insensitive matching
         def find_column(df, possible_names):
@@ -148,26 +148,20 @@ def load_and_process_data(uploaded_file):
             if found_col:
                 sales_clean[standard_name] = sales_df[found_col]
         
-        # Handle duplicate sales records
+        # Handle duplicate sales records silently
         duplicate_subset = ['STYLE_ID', 'YEAR', 'MONTH']
         
         # Check if Maketplace column exists and add it to subset
         if 'Maketplace' in sales_clean.columns:
             duplicate_subset.append('Maketplace')
         
-        # Now check for duplicates with the correct subset
-        duplicate_check = sales_clean.duplicated(subset=duplicate_subset, keep=False).sum()
+        # Get list of columns to aggregate
+        agg_dict = {'SALES_QTY': 'sum', 'OPENING_STOCK': 'first'}
+        for col in sales_clean.columns:
+            if col not in duplicate_subset + ['SALES_QTY', 'OPENING_STOCK']:
+                agg_dict[col] = 'first'  # Take first value for categorical columns
         
-        if duplicate_check > 0:
-            st.sidebar.warning(f"⚠️ Found {duplicate_check} duplicate sales records. Aggregating...")
-            
-            # Get list of columns to aggregate
-            agg_dict = {'SALES_QTY': 'sum', 'OPENING_STOCK': 'first'}
-            for col in sales_clean.columns:
-                if col not in duplicate_subset + ['SALES_QTY', 'OPENING_STOCK']:
-                    agg_dict[col] = 'first'  # Take first value for categorical columns
-            
-            sales_clean = sales_clean.groupby(duplicate_subset, as_index=False).agg(agg_dict)
+        sales_clean = sales_clean.groupby(duplicate_subset, as_index=False).agg(agg_dict)
         
         # Add month name for display
         month_names = {1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 
@@ -182,21 +176,6 @@ def load_and_process_data(uploaded_file):
             (sales_clean['SALES_QTY'] / sales_clean['OPENING_STOCK']) * 100,
             0
         )
-        
-        # Add a column for sales efficiency classification (for display only, not for filtering)
-        def classify_sales_percentage(percent):
-            if percent == 0:
-                return 'No Opening Stock'
-            elif percent <= 30:
-                return 'Low (<30%)'
-            elif percent <= 60:
-                return 'Medium (30-60%)'
-            elif percent <= 100:
-                return 'High (60-100%)'
-            else:
-                return 'Very High (>100%)'
-        
-        sales_clean['SALES_EFFICIENCY'] = sales_clean['SALES_PERCENTAGE'].apply(classify_sales_percentage)
         
         return sales_clean
         
@@ -215,35 +194,19 @@ if uploaded_file is not None:
         # Display success message
         st.success(f"✅ Data loaded successfully! {len(df):,} records processed")
         
-        # Data summary metrics
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # Data summary metrics - Clean and simple
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             total_sales = df['SALES_QTY'].sum()
             st.metric("Total Sales", f"{total_sales:,.0f}")
         with col2:
             total_opening_stock = df['OPENING_STOCK'].sum()
             st.metric("Total Opening Stock", f"{total_opening_stock:,.0f}")
-  
-        with col4:
+        with col3:
             st.metric("Unique Products", f"{df['STYLE_ID'].nunique():,.0f}")
-        with col5:
+        with col4:
             avg_monthly_sales = df.groupby(['YEAR', 'MONTH'])['SALES_QTY'].sum().mean()
             st.metric("Avg Monthly Sales", f"{avg_monthly_sales:,.0f}")
-        
-        # Additional metrics row
-        col6, col7, col8, col9, col10 = st.columns(5)
-        with col6:
-            time_period = f"{df['YEAR'].min()} - {df['YEAR'].max()}"
-            st.metric("Time Period", time_period)
-        with col7:
-            sales_ratio = (df['SALES_QTY'].sum() / df[df['OPENING_STOCK'] > 0]['OPENING_STOCK'].sum() * 100) \
-                if df[df['OPENING_STOCK'] > 0]['OPENING_STOCK'].sum() > 0 else 0
-            st.metric("Overall Sales %", f"{sales_ratio:.1f}%")
-    
-
-        with col10:
-            months_covered = df[['YEAR', 'MONTH']].drop_duplicates().shape[0]
-            st.metric("Months Covered", f"{months_covered}")
         
         st.markdown("---")
         
@@ -279,7 +242,6 @@ if uploaded_file is not None:
         - 📊 Records: {len(filtered_df):,}
         - 💰 Sales: {filtered_df['SALES_QTY'].sum():,.0f}
         - 📦 Opening Stock: {filtered_df['OPENING_STOCK'].sum():,.0f}
-        - 📊 Sales %: {filtered_df[filtered_df['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean():.1f}%
         """)
         
         if len(filtered_df) == 0:
@@ -303,8 +265,8 @@ if uploaded_file is not None:
                     0
                 )
                 
-                # Sort by sales percentage descending by default
-                grouped = grouped.sort_values('SALES_PERCENTAGE', ascending=False)
+                # Sort by Sales Qty descending by default (for better user experience)
+                grouped = grouped.sort_values('SALES_QTY', ascending=False)
                 grouped.rename(columns={group_col: group_name}, inplace=True)
                 
                 return grouped
@@ -375,26 +337,12 @@ if uploaded_file is not None:
                     # Marketplace data table with all metrics
                     with st.expander("📋 Marketplace Data Table with Stock Metrics"):
                         market_table = marketplace_data.copy()
-                        market_table.columns = ['Marketplace', 'Sales Quantity', 'Opening Stock', 'Sales %']
-                        market_table['Sales Quantity'] = market_table['Sales Quantity'].apply(lambda x: f"{x:,.0f}")
+                        market_table.columns = ['Marketplace', 'Sales Qty', 'Opening Stock', 'Sales %']
+                        market_table['Sales Qty'] = market_table['Sales Qty'].apply(lambda x: f"{x:,.0f}")
                         market_table['Opening Stock'] = market_table['Opening Stock'].apply(lambda x: f"{x:,.0f}")
                         market_table['Sales %'] = market_table['Sales %'].apply(lambda x: f"{x:.1f}%")
                         
-                        # Apply conditional formatting
-                        def highlight_sales_percentage(val):
-                            try:
-                                percent = float(val.replace('%', '').replace(',', ''))
-                                if percent > 100:
-                                    return 'background-color: #ffcccc'
-                                elif percent > 60:
-                                    return 'background-color: #ffffcc'
-                                else:
-                                    return 'background-color: #ccffcc'
-                            except:
-                                return ''
-                        
-                        styled_table = market_table.style.applymap(highlight_sales_percentage, subset=['Sales %'])
-                        st.dataframe(styled_table, hide_index=True, use_container_width=True)
+                        st.dataframe(market_table, hide_index=True, use_container_width=True)
                 
                 st.markdown("---")
             
@@ -441,7 +389,7 @@ if uploaded_file is not None:
                                     display_table['Opening Stock'] = display_table['Opening Stock'].apply(lambda x: f"{x:,.0f}")
                                     display_table['Sales %'] = display_table['Sales %'].apply(lambda x: f"{x:.1f}%")
                                     
-                                    # Display table with sorting
+                                    # Display table with sorting - Streamlit now supports native sorting
                                     st.dataframe(
                                         display_table,
                                         hide_index=True,
@@ -452,9 +400,8 @@ if uploaded_file is not None:
                                     # Show summary below table
                                     total_sales_cat = category_table['Sales Qty'].sum()
                                     total_stock_cat = category_table['Opening Stock'].sum()
-                                    avg_percent_cat = category_table[category_table['Opening Stock'] > 0]['Sales %'].mean()
                                     
-                                    st.caption(f"**Summary:** Sales: {total_sales_cat:,.0f} | Stock: {total_stock_cat:,.0f} | Avg %: {avg_percent_cat:.1f}%")
+                                    st.caption(f"**Summary:** Sales: {total_sales_cat:,.0f} | Stock: {total_stock_cat:,.0f}")
                                 else:
                                     st.info(f"No data available for {display_name}")
                                 
@@ -554,21 +501,28 @@ if uploaded_file is not None:
                 0
             )
             
+            # Default sort by Sales Qty descending
+            default_sort = "Sales Quantity (Highest)"
+            product_data = product_data.sort_values('SALES_QTY', ascending=False)
+            
             # Sort options
             sort_option = st.radio(
                 "Sort products by:",
-                ["Sales Percentage (Highest)", "Sales Quantity (Highest)", "Opening Stock (Highest)", "Sales Percentage (Lowest)"],
+                ["Sales Quantity (Highest)", "Sales Percentage (Highest)", "Opening Stock (Highest)", "Sales Quantity (Lowest)", "Sales Percentage (Lowest)"],
                 horizontal=True,
+                index=0,
                 key="product_sort"
             )
             
-            if "Sales Percentage" in sort_option and "Highest" in sort_option:
-                product_data = product_data.sort_values('SALES_PERCENTAGE', ascending=False)
-            elif "Sales Quantity" in sort_option:
+            if sort_option == "Sales Quantity (Highest)":
                 product_data = product_data.sort_values('SALES_QTY', ascending=False)
-            elif "Opening Stock" in sort_option:
+            elif sort_option == "Sales Percentage (Highest)":
+                product_data = product_data.sort_values('SALES_PERCENTAGE', ascending=False)
+            elif sort_option == "Opening Stock (Highest)":
                 product_data = product_data.sort_values('OPENING_STOCK', ascending=False)
-            else:
+            elif sort_option == "Sales Quantity (Lowest)":
+                product_data = product_data.sort_values('SALES_QTY', ascending=True)
+            elif sort_option == "Sales Percentage (Lowest)":
                 product_data = product_data.sort_values('SALES_PERCENTAGE', ascending=True)
             
             # Display in 2 columns: Top Products and Complete Table
@@ -618,67 +572,16 @@ if uploaded_file is not None:
                 total_products = len(all_products)
                 total_sales_all = all_products['Sales Qty'].sum()
                 total_stock_all = all_products['Opening Stock'].sum()
-                avg_percent_all = all_products[all_products['Opening Stock'] > 0]['Sales %'].mean()
                 
-                st.caption(f"**Summary:** Products: {total_products} | Sales: {total_sales_all:,.0f} | Stock: {total_stock_all:,.0f} | Avg %: {avg_percent_all:.1f}%")
+                st.caption(f"**Summary:** Products: {total_products} | Sales: {total_sales_all:,.0f} | Stock: {total_stock_all:,.0f}")
                 st.markdown("</div>", unsafe_allow_html=True)
-            
-            # Sales Efficiency Distribution Pie Chart (for information only, not for filtering)
-            st.markdown("### 📊 Sales Efficiency Distribution (Information Only)")
-            
-            efficiency_data = filtered_df.groupby('SALES_EFFICIENCY').agg({
-                'STYLE_ID': 'nunique',
-                'SALES_QTY': 'sum'
-            }).reset_index()
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                fig_pie = px.pie(
-                    efficiency_data,
-                    names='SALES_EFFICIENCY',
-                    values='STYLE_ID',
-                    title='Products by Sales Efficiency',
-                    color='SALES_EFFICIENCY',
-                    color_discrete_map={
-                        'Very High (>100%)': '#ff0000',
-                        'High (60-100%)': '#ff9900',
-                        'Medium (30-60%)': '#ffff00',
-                        'Low (<30%)': '#00ff00',
-                        'No Opening Stock': '#cccccc'
-                    }
-                )
-                fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-                fig_pie.update_layout(height=400)
-                st.plotly_chart(fig_pie, use_container_width=True)
-            
-            with col2:
-                # Efficiency summary table
-                efficiency_summary = efficiency_data.copy()
-                efficiency_summary.columns = ['Sales Efficiency', 'Product Count', 'Total Sales']
-                efficiency_summary['% of Products'] = (efficiency_summary['Product Count'] / efficiency_summary['Product Count'].sum() * 100).round(1)
-                efficiency_summary['% of Sales'] = (efficiency_summary['Total Sales'] / efficiency_summary['Total Sales'].sum() * 100).round(1)
-                
-                # Format for display
-                display_eff = efficiency_summary.copy()
-                display_eff['Product Count'] = display_eff['Product Count'].apply(lambda x: f"{x:,}")
-                display_eff['Total Sales'] = display_eff['Total Sales'].apply(lambda x: f"{x:,.0f}")
-                display_eff['% of Products'] = display_eff['% of Products'].apply(lambda x: f"{x}%")
-                display_eff['% of Sales'] = display_eff['% of Sales'].apply(lambda x: f"{x}%")
-                
-                st.dataframe(
-                    display_eff,
-                    hide_index=True,
-                    use_container_width=True,
-                    height=400
-                )
             
             st.markdown("---")
             
             # Data validation section
             with st.expander("🔍 Data Validation Details"):
                 st.write("**Sample Data (First 10 Rows):**")
-                display_cols = ['STYLE_ID', 'YEAR', 'MONTH', 'SALES_QTY', 'OPENING_STOCK', 'SALES_PERCENTAGE', 'SALES_EFFICIENCY']
+                display_cols = ['STYLE_ID', 'YEAR', 'MONTH', 'SALES_QTY', 'OPENING_STOCK', 'SALES_PERCENTAGE']
                 if 'Maketplace' in filtered_df.columns:
                     display_cols.append('Maketplace')
                 if 'Subcategory' in filtered_df.columns:
@@ -688,7 +591,7 @@ if uploaded_file is not None:
                 
                 # Display sample data
                 sample_df = filtered_df[display_cols].head(10).copy()
-                sample_df.columns = ['Style ID', 'Year', 'Month', 'Sales Qty', 'Opening Stock', 'Sales %', 'Efficiency'] + \
+                sample_df.columns = ['Style ID', 'Year', 'Month', 'Sales Qty', 'Opening Stock', 'Sales %'] + \
                                    (['Marketplace'] if 'Maketplace' in filtered_df.columns else []) + \
                                    (['Subcategory'] if 'Subcategory' in filtered_df.columns else []) + \
                                    (['Brand'] if 'Brand' in filtered_df.columns else [])
@@ -710,8 +613,6 @@ if uploaded_file is not None:
                         'Records with Opening Stock > 0',
                         'Average Sales per Record',
                         'Average Opening Stock per Record',
-                        'Average Sales Percentage',
-                        'Maximum Sales %',
                         'Maximum Sales (Single Record)',
                         'Time Period Covered'
                     ],
@@ -722,8 +623,6 @@ if uploaded_file is not None:
                         (filtered_df['OPENING_STOCK'] > 0).sum(),
                         f"{filtered_df['SALES_QTY'].mean():.0f}",
                         f"{filtered_df['OPENING_STOCK'].mean():.0f}",
-                        f"{filtered_df[filtered_df['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean():.1f}%",
-                        f"{filtered_df['SALES_PERCENTAGE'].max():.1f}%",
                         f"{filtered_df['SALES_QTY'].max():,.0f}",
                         f"{filtered_df['YEAR'].min()} - {filtered_df['YEAR'].max()}"
                     ]
@@ -758,15 +657,12 @@ else:
         ### **Key Features:**
         - **Opening Stock Metrics** - Displayed alongside sales
         - **Sales Percentage** - Calculated as (Sales Qty / Opening Stock) * 100
-        - **Sales Efficiency Classification** - Categories for sales performance (display only)
         - **Dual-axis Charts** - Sales quantity and percentage together
-        - **Conditional Formatting** - Color-coded sales percentages
-        - **Sorting Options** - Sort products by different metrics
-        - **Efficiency Analysis** - Pie chart showing sales efficiency distribution
+        - **Interactive Sorting** - Click column headers to sort tables
+        - **Product Sorting Options** - Sort by Sales Qty, Sales %, or Opening Stock
         
         ### **Metrics in Tables:**
         1. **Sales Quantity** - Total units sold
         2. **Opening Stock** - Starting inventory
         3. **Sales %** - Percentage of stock sold
-        4. **Efficiency** - Performance category
         """)
