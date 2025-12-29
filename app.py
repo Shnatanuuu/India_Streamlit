@@ -148,8 +148,7 @@ def load_and_process_data(uploaded_file):
             if found_col:
                 sales_clean[standard_name] = sales_df[found_col]
         
-        # Handle duplicate sales records - FIXED VERSION
-        # First, build the subset for duplicate checking
+        # Handle duplicate sales records
         duplicate_subset = ['STYLE_ID', 'YEAR', 'MONTH']
         
         # Check if Maketplace column exists and add it to subset
@@ -184,12 +183,20 @@ def load_and_process_data(uploaded_file):
             0
         )
         
-
+        # Add a column for sales efficiency classification (for display only, not for filtering)
+        def classify_sales_percentage(percent):
+            if percent == 0:
+                return 'No Opening Stock'
+            elif percent <= 30:
+                return 'Low (<30%)'
+            elif percent <= 60:
+                return 'Medium (30-60%)'
+            elif percent <= 100:
+                return 'High (60-100%)'
+            else:
+                return 'Very High (>100%)'
         
-        # Data validation summary
-        total_sales = sales_clean['SALES_QTY'].sum()
-        total_opening_stock = sales_clean['OPENING_STOCK'].sum()
-        avg_sales_percentage = sales_clean[sales_clean['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean()
+        sales_clean['SALES_EFFICIENCY'] = sales_clean['SALES_PERCENTAGE'].apply(classify_sales_percentage)
         
         return sales_clean
         
@@ -217,13 +224,32 @@ if uploaded_file is not None:
             total_opening_stock = df['OPENING_STOCK'].sum()
             st.metric("Total Opening Stock", f"{total_opening_stock:,.0f}")
         with col3:
-            st.metric("Unique Products", f"{df['STYLE_ID'].nunique():,.0f}")
+            avg_sales_percentage = df[df['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean()
+            st.metric("Avg Sales %", f"{avg_sales_percentage:.1f}%" if not pd.isna(avg_sales_percentage) else "N/A")
         with col4:
+            st.metric("Unique Products", f"{df['STYLE_ID'].nunique():,.0f}")
+        with col5:
             avg_monthly_sales = df.groupby(['YEAR', 'MONTH'])['SALES_QTY'].sum().mean()
             st.metric("Avg Monthly Sales", f"{avg_monthly_sales:,.0f}")
-        with col5:
+        
+        # Additional metrics row
+        col6, col7, col8, col9, col10 = st.columns(5)
+        with col6:
             time_period = f"{df['YEAR'].min()} - {df['YEAR'].max()}"
             st.metric("Time Period", time_period)
+        with col7:
+            sales_ratio = (df['SALES_QTY'].sum() / df[df['OPENING_STOCK'] > 0]['OPENING_STOCK'].sum() * 100) \
+                if df[df['OPENING_STOCK'] > 0]['OPENING_STOCK'].sum() > 0 else 0
+            st.metric("Overall Sales %", f"{sales_ratio:.1f}%")
+        with col8:
+            high_efficiency = len(df[df['SALES_PERCENTAGE'] > 60])
+            st.metric("High Efficiency (>60%)", f"{high_efficiency:,}")
+        with col9:
+            max_sales_percent = df['SALES_PERCENTAGE'].max()
+            st.metric("Max Sales %", f"{max_sales_percent:.1f}%")
+        with col10:
+            months_covered = df[['YEAR', 'MONTH']].drop_duplicates().shape[0]
+            st.metric("Months Covered", f"{months_covered}")
         
         st.markdown("---")
         
@@ -240,9 +266,6 @@ if uploaded_file is not None:
         selected_year = st.sidebar.selectbox("Select Year", ['All'] + years)
         selected_month = st.sidebar.selectbox("Select Month", ['All'] + [month_names_dict[m] for m in months if m in month_names_dict])
         
-        # Add sales efficiency filter
-
-        
         # Filter data
         filtered_df = df.copy()
         
@@ -253,10 +276,17 @@ if uploaded_file is not None:
             month_num = [k for k, v in month_names_dict.items() if v == selected_month][0]
             filtered_df = filtered_df[filtered_df['MONTH'] == month_num]
         
-
-        
         # Display filter summary
-
+        st.sidebar.markdown("---")
+        st.sidebar.info(f"""
+        **Filter Applied:**
+        - 📅 Year: {selected_year}
+        - 📆 Month: {selected_month}
+        - 📊 Records: {len(filtered_df):,}
+        - 💰 Sales: {filtered_df['SALES_QTY'].sum():,.0f}
+        - 📦 Opening Stock: {filtered_df['OPENING_STOCK'].sum():,.0f}
+        - 📊 Sales %: {filtered_df[filtered_df['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean():.1f}%
+        """)
         
         if len(filtered_df) == 0:
             st.warning("⚠️ No data available for the selected filters.")
@@ -599,8 +629,8 @@ if uploaded_file is not None:
                 st.caption(f"**Summary:** Products: {total_products} | Sales: {total_sales_all:,.0f} | Stock: {total_stock_all:,.0f} | Avg %: {avg_percent_all:.1f}%")
                 st.markdown("</div>", unsafe_allow_html=True)
             
-            # Sales Efficiency Distribution Pie Chart
-            st.markdown("### 📊 Sales Efficiency Distribution")
+            # Sales Efficiency Distribution Pie Chart (for information only, not for filtering)
+            st.markdown("### 📊 Sales Efficiency Distribution (Information Only)")
             
             efficiency_data = filtered_df.groupby('SALES_EFFICIENCY').agg({
                 'STYLE_ID': 'nunique',
@@ -731,16 +761,16 @@ else:
         - `Brand` - Product brand
         - `Color` - Product color
         
-        ### **Key Features Added:**
+        ### **Key Features:**
         - **Opening Stock Metrics** - Displayed alongside sales
         - **Sales Percentage** - Calculated as (Sales Qty / Opening Stock) * 100
-        - **Sales Efficiency Classification** - Categories for sales performance
+        - **Sales Efficiency Classification** - Categories for sales performance (display only)
         - **Dual-axis Charts** - Sales quantity and percentage together
         - **Conditional Formatting** - Color-coded sales percentages
         - **Sorting Options** - Sort products by different metrics
         - **Efficiency Analysis** - Pie chart showing sales efficiency distribution
         
-        ### **New Metrics in Tables:**
+        ### **Metrics in Tables:**
         1. **Sales Quantity** - Total units sold
         2. **Opening Stock** - Starting inventory
         3. **Sales %** - Percentage of stock sold
