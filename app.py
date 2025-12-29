@@ -225,33 +225,24 @@ if uploaded_file is not None:
         st.success(f"✅ Data loaded successfully! {len(df):,} records processed")
         
         # Data summary metrics
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4 ,col5= st.columns(5)
         with col1:
             total_sales = df['SALES_QTY'].sum()
             st.metric("Total Sales", f"{total_sales:,.0f}")
         with col2:
             total_opening_stock = df['OPENING_STOCK'].sum()
             st.metric("Total Opening Stock", f"{total_opening_stock:,.0f}")
+      
         with col3:
-            avg_sales_percentage = df[df['OPENING_STOCK'] > 0]['SALES_PERCENTAGE'].mean()
-            st.metric("Avg Sales %", f"{avg_sales_percentage:.1f}%", 
-                     delta=f"{avg_sales_percentage - 50:.1f}%" if avg_sales_percentage else "N/A")
-        with col4:
             st.metric("Unique Products", f"{df['STYLE_ID'].nunique():,.0f}")
         
-        # Additional metrics
-        col5, col6, col7, col8 = st.columns(4)
-        with col5:
-            sales_ratio = (df['SALES_QTY'].sum() / df[df['OPENING_STOCK'] > 0]['OPENING_STOCK'].sum() * 100) \
-                if df[df['OPENING_STOCK'] > 0]['OPENING_STOCK'].sum() > 0 else 0
-            st.metric("Overall Sales %", f"{sales_ratio:.1f}%")
-        with col6:
-            high_efficiency = len(df[df['SALES_PERCENTAGE'] > 60])
-            st.metric("High Efficiency (>60%)", f"{high_efficiency:,}")
-        with col7:
+  
+       
+    
+        with co4:
             avg_monthly_sales = df.groupby(['YEAR', 'MONTH'])['SALES_QTY'].sum().mean()
             st.metric("Avg Monthly Sales", f"{avg_monthly_sales:,.0f}")
-        with col8:
+        with col5:
             time_period = f"{df['YEAR'].min()} - {df['YEAR'].max()}"
             st.metric("Time Period", time_period)
         
