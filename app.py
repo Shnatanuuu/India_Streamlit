@@ -408,14 +408,6 @@ if uploaded_file is not None:
                                         use_container_width=True,
                                         height=300
                                     )
-                                    
-
-                                    
-
-                                    
-                                    # Show unique values count
-                                    unique_count = len(category_table)
-                                    st.caption(f"Unique {display_name}s: {unique_count}")
                                 else:
                                     st.info(f"No data available for {display_name}")
                                 
@@ -582,11 +574,6 @@ if uploaded_file is not None:
                     height=400
                 )
                 
-                total_products = len(all_products)
-                total_sales_all = all_products['Sales Qty'].sum()
-                total_stock_all = all_products['Opening Stock'].sum()
-                
-                st.caption(f"Total Products: {total_products} | Total Sales: {total_sales_all:,.0f} | Total Stock: {total_stock_all:,.0f}")
                 st.markdown("</div>", unsafe_allow_html=True)
             
             # Data validation section
