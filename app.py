@@ -131,7 +131,7 @@ def load_and_process_data(uploaded_file):
             'OPENING_STOCK': pd.to_numeric(sales_df[opening_stock_col], errors='coerce').fillna(0)
         })
         
-        # Add additional columns from sales if they exist
+        # Add additional columns from sales if they exist - with PROPER TRIMMING
         additional_cols_mapping = {
             'Subcategory': ['Subcategory', 'SUBCATEGORY', 'Sub_Category'],
             'Season': ['Season', 'SEASON'],
@@ -146,7 +146,11 @@ def load_and_process_data(uploaded_file):
         for standard_name, possible_names in additional_cols_mapping.items():
             found_col = find_column(sales_df, possible_names)
             if found_col:
-                sales_clean[standard_name] = sales_df[found_col]
+                # PROPERLY TRIM TEXT COLUMNS to remove leading/trailing spaces
+                if sales_df[found_col].dtype == 'object':  # Text columns
+                    sales_clean[standard_name] = sales_df[found_col].astype(str).str.strip()
+                else:
+                    sales_clean[standard_name] = sales_df[found_col]
         
         # Handle duplicate sales records silently
         duplicate_subset = ['STYLE_ID', 'YEAR', 'MONTH']
@@ -193,6 +197,30 @@ if uploaded_file is not None:
         
         # Display success message only
         st.success(f"✅ Data loaded successfully! {len(df):,} records processed")
+        
+        # Display data quality check for text columns
+        with st.expander("🔍 Data Quality Check (Text Columns)"):
+            text_columns = ['Brand', 'Subcategory', 'Season', 'Color', 'Heel_Type_1', 'Maketplace']
+            available_text_cols = [col for col in text_columns if col in df.columns]
+            
+            quality_info = []
+            for col in available_text_cols:
+                unique_count = df[col].nunique()
+                sample_values = df[col].dropna().unique()[:5].tolist()
+                has_spaces = any(str(val).strip() != str(val) for val in df[col].dropna().unique()[:20])
+                
+                quality_info.append({
+                    'Column': col,
+                    'Unique Values': unique_count,
+                    'Sample Values': ', '.join(str(v) for v in sample_values),
+                    'Has Leading/Trailing Spaces': 'Yes' if has_spaces else 'No'
+                })
+            
+            quality_df = pd.DataFrame(quality_info)
+            st.dataframe(quality_df, use_container_width=True)
+            
+            if any(q['Has Leading/Trailing Spaces'] == 'Yes' for q in quality_info):
+                st.info("ℹ️ Leading/trailing spaces have been automatically trimmed from all text columns.")
         
         st.markdown("---")
         
@@ -386,6 +414,10 @@ if uploaded_file is not None:
                                     total_stock_cat = category_table['Opening Stock'].sum()
                                     
                                     st.caption(f"Total Sales: {total_sales_cat:,.0f} | Total Stock: {total_stock_cat:,.0f}")
+                                    
+                                    # Show unique values count
+                                    unique_count = len(category_table)
+                                    st.caption(f"Unique {display_name}s: {unique_count}")
                                 else:
                                     st.info(f"No data available for {display_name}")
                                 
