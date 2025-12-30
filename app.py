@@ -409,11 +409,9 @@ if uploaded_file is not None:
                                         height=300
                                     )
                                     
-                                    # Show summary below table
-                                    total_sales_cat = category_table['Sales Qty'].sum()
-                                    total_stock_cat = category_table['Opening Stock'].sum()
+
                                     
-                                    st.caption(f"Total Sales: {total_sales_cat:,.0f} | Total Stock: {total_stock_cat:,.0f}")
+
                                     
                                     # Show unique values count
                                     unique_count = len(category_table)
