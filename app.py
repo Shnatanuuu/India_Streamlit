@@ -264,6 +264,11 @@ if uploaded_file is not None:
                 if group_col not in df.columns:
                     return pd.DataFrame()
                 
+                # IMPORTANT: Trim text column values before grouping
+                if df[group_col].dtype == 'object':
+                    df = df.copy()
+                    df[group_col] = df[group_col].astype(str).str.strip()
+                
                 # Group by category with stock metrics
                 grouped = df.groupby(group_col, observed=True).agg({
                     'SALES_QTY': 'sum',
@@ -348,13 +353,18 @@ if uploaded_file is not None:
                     
                     # Marketplace data table with all metrics
                     with st.expander("📋 Marketplace Data Table with Stock Metrics"):
+                        # Create a display DataFrame with formatted values
                         market_table = marketplace_data.copy()
-                        market_table.columns = ['Marketplace', 'Sales Qty', 'Opening Stock', 'Sales %']
-                        market_table['Sales Qty'] = market_table['Sales Qty'].apply(lambda x: f"{x:,.0f}")
-                        market_table['Opening Stock'] = market_table['Opening Stock'].apply(lambda x: f"{x:,.0f}")
-                        market_table['Sales %'] = market_table['Sales %'].apply(lambda x: f"{x:.1f}%")
+                        market_table_for_display = market_table.copy()
+                        market_table_for_display['SALES_QTY'] = market_table['SALES_QTY'].apply(lambda x: f"{x:,.0f}")
+                        market_table_for_display['OPENING_STOCK'] = market_table['OPENING_STOCK'].apply(lambda x: f"{x:,.0f}")
+                        market_table_for_display['SALES_PERCENTAGE'] = market_table['SALES_PERCENTAGE'].apply(lambda x: f"{x:.1f}%")
                         
-                        st.dataframe(market_table, hide_index=True, use_container_width=True)
+                        # Rename columns for display
+                        market_table_for_display.columns = ['Marketplace', 'Sales Qty', 'Opening Stock', 'Sales %']
+                        
+                        # Display the formatted table
+                        st.dataframe(market_table_for_display, hide_index=True, use_container_width=True)
                 
                 st.markdown("---")
             
@@ -391,17 +401,24 @@ if uploaded_file is not None:
                                 category_data = analyze_with_stock(filtered_df, col_name, display_name)
                                 
                                 if not category_data.empty:
-                                    # Create table with all metrics
-                                    category_table = category_data.copy()
-                                    category_table.columns = [display_name, 'Sales Qty', 'Opening Stock', 'Sales %']
+                                    # Create two dataframes: one for sorting, one for display
+                                    sortable_table = category_data.copy()
+                                    sortable_table.columns = [display_name, 'SALES_QTY', 'OPENING_STOCK', 'SALES_PERCENTAGE']
                                     
-                                    # Format the table
-                                    display_table = category_table.copy()
-                                    display_table['Sales Qty'] = display_table['Sales Qty'].apply(lambda x: f"{x:,.0f}")
-                                    display_table['Opening Stock'] = display_table['Opening Stock'].apply(lambda x: f"{x:,.0f}")
-                                    display_table['Sales %'] = display_table['Sales %'].apply(lambda x: f"{x:.1f}%")
+                                    # Create display table with formatted values
+                                    display_table = sortable_table.copy()
+                                    display_table['SALES_QTY'] = display_table['SALES_QTY'].apply(lambda x: f"{x:,.0f}")
+                                    display_table['OPENING_STOCK'] = display_table['OPENING_STOCK'].apply(lambda x: f"{x:,.0f}")
+                                    display_table['SALES_PERCENTAGE'] = display_table['SALES_PERCENTAGE'].apply(lambda x: f"{x:.1f}%")
                                     
-                                    # Display table with sorting
+                                    # Rename columns for display
+                                    display_table.columns = [display_name, 'Sales Qty', 'Opening Stock', 'Sales %']
+                                    
+                                    # Create a copy of the sortable table for actual sorting
+                                    sort_df = sortable_table.copy()
+                                    sort_df.columns = [display_name, 'Sales Qty_num', 'Opening Stock_num', 'Sales %_num']
+                                    
+                                    # Display table - Streamlit will handle sorting automatically
                                     st.dataframe(
                                         display_table,
                                         hide_index=True,
@@ -482,17 +499,19 @@ if uploaded_file is not None:
             
             # Monthly data table with all metrics
             with st.expander("📋 Monthly Trend Data Table with Stock Metrics"):
+                # Create a display DataFrame with formatted values
                 trend_table = monthly_data[['Period', 'SALES_QTY', 'OPENING_STOCK', 'SALES_PERCENTAGE']].copy()
-                trend_table.columns = ['Period', 'Sales Quantity', 'Opening Stock', 'Sales %']
-                trend_table['Sales Quantity'] = trend_table['Sales Quantity'].apply(lambda x: f"{x:,.0f}")
-                trend_table['Opening Stock'] = trend_table['Opening Stock'].apply(lambda x: f"{x:,.0f}")
-                trend_table['Sales %'] = trend_table['Sales %'].apply(lambda x: f"{x:.1f}%")
-                st.dataframe(trend_table, hide_index=True, use_container_width=True)
+                trend_table_for_display = trend_table.copy()
+                trend_table_for_display['SALES_QTY'] = trend_table['SALES_QTY'].apply(lambda x: f"{x:,.0f}")
+                trend_table_for_display['OPENING_STOCK'] = trend_table['OPENING_STOCK'].apply(lambda x: f"{x:,.0f}")
+                trend_table_for_display['SALES_PERCENTAGE'] = trend_table['SALES_PERCENTAGE'].apply(lambda x: f"{x:.1f}%")
+                
+                # Rename columns for display
+                trend_table_for_display.columns = ['Period', 'Sales Quantity', 'Opening Stock', 'Sales %']
+                
+                st.dataframe(trend_table_for_display, hide_index=True, use_container_width=True)
             
             st.markdown("---")
-            
-            # REMOVED: Top Products Analysis with Stock Metrics section
-            # REMOVED: Data validation section
             
     except Exception as e:
         st.error(f"❌ Error: {str(e)}")
