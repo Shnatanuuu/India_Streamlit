@@ -124,14 +124,14 @@ def load_and_process_data(uploaded_file):
         
         # Create clean dataframe with standardized names
         sales_clean = pd.DataFrame({
-            'STYLE_ID': sales_df[sales_style_col].astype(str).str.strip(),
+            'STYLE_ID': sales_df[sales_style_col].astype(str).str.strip().str.upper(),  # UPPERCASE for consistency
             'YEAR': pd.to_numeric(sales_df[sales_year_col], errors='coerce'),
             'MONTH': pd.to_numeric(sales_df[sales_month_col], errors='coerce'),
             'SALES_QTY': pd.to_numeric(sales_df[sales_qty_col], errors='coerce').fillna(0),
             'OPENING_STOCK': pd.to_numeric(sales_df[opening_stock_col], errors='coerce').fillna(0)
         })
         
-        # Add additional columns from sales if they exist - with PROPER TRIMMING
+        # Add additional columns from sales if they exist - with PROPER TRIMMING and UPPERCASE
         additional_cols_mapping = {
             'Subcategory': ['Subcategory', 'SUBCATEGORY', 'Sub_Category'],
             'Season': ['Season', 'SEASON'],
@@ -146,9 +146,9 @@ def load_and_process_data(uploaded_file):
         for standard_name, possible_names in additional_cols_mapping.items():
             found_col = find_column(sales_df, possible_names)
             if found_col:
-                # PROPERLY TRIM TEXT COLUMNS to remove leading/trailing spaces
+                # PROPERLY TRIM TEXT COLUMNS to remove leading/trailing spaces and convert to UPPERCASE
                 if sales_df[found_col].dtype == 'object':  # Text columns
-                    sales_clean[standard_name] = sales_df[found_col].astype(str).str.strip()
+                    sales_clean[standard_name] = sales_df[found_col].astype(str).str.strip().str.upper()
                 else:
                     sales_clean[standard_name] = sales_df[found_col]
         
@@ -264,10 +264,10 @@ if uploaded_file is not None:
                 if group_col not in df.columns:
                     return pd.DataFrame()
                 
-                # IMPORTANT: Trim text column values before grouping
+                # IMPORTANT: Trim text column values before grouping and ensure UPPERCASE
                 if df[group_col].dtype == 'object':
                     df = df.copy()
-                    df[group_col] = df[group_col].astype(str).str.strip()
+                    df[group_col] = df[group_col].astype(str).str.strip().str.upper()
                 
                 # Group by category with stock metrics
                 grouped = df.groupby(group_col, observed=True).agg({
@@ -322,7 +322,7 @@ if uploaded_file is not None:
                                 format="%.1f%%"
                             )
                         else:
-                            # For text columns
+                            # For text columns - convert to title case for display
                             column_config[col] = st.column_config.TextColumn(
                                 display_name,
                                 help="Click to sort"
@@ -406,6 +406,10 @@ if uploaded_file is not None:
                         # Create sortable dataframe
                         display_df, column_config = create_sortable_dataframe(marketplace_data, column_mapping)
                         
+                        # Convert text columns to title case for better display
+                        if 'Marketplace' in display_df.columns:
+                            display_df['Marketplace'] = display_df['Marketplace'].str.title()
+                        
                         # Display with column configuration
                         st.dataframe(
                             display_df,
@@ -459,6 +463,10 @@ if uploaded_file is not None:
                                     
                                     # Create sortable dataframe
                                     display_df, column_config = create_sortable_dataframe(category_data, column_mapping)
+                                    
+                                    # Convert text columns to title case for better display
+                                    if display_name in display_df.columns:
+                                        display_df[display_name] = display_df[display_name].str.title()
                                     
                                     # Display with column configuration
                                     st.dataframe(
