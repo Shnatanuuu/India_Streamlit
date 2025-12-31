@@ -312,7 +312,7 @@ if uploaded_file is not None:
                             column_config[col] = st.column_config.NumberColumn(
                                 display_name,
                                 help="Click to sort",
-                                format="%,d"
+                                format="%d"
                             )
                         elif 'PERCENTAGE' in col.upper():
                             # Format as percentages
