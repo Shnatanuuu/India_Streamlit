@@ -288,6 +288,48 @@ if uploaded_file is not None:
                 
                 return grouped
             
+            # Function to create styled dataframe with proper sorting
+            def create_sortable_dataframe(data, columns_mapping):
+                """
+                Create a dataframe with proper formatting that maintains sortability
+                
+                Parameters:
+                data: DataFrame with numeric values
+                columns_mapping: dict mapping original column names to display names
+                """
+                # Create a copy for display
+                display_df = data.copy()
+                
+                # Configure column display formats
+                column_config = {}
+                
+                for col in display_df.columns:
+                    if col in columns_mapping:
+                        display_name = columns_mapping[col]
+                        
+                        if 'QTY' in col.upper() or 'STOCK' in col.upper():
+                            # Format as numbers with commas
+                            column_config[col] = st.column_config.NumberColumn(
+                                display_name,
+                                help="Click to sort",
+                                format="%,d"
+                            )
+                        elif 'PERCENTAGE' in col.upper():
+                            # Format as percentages
+                            column_config[col] = st.column_config.NumberColumn(
+                                display_name,
+                                help="Click to sort",
+                                format="%.1f%%"
+                            )
+                        else:
+                            # For text columns
+                            column_config[col] = st.column_config.TextColumn(
+                                display_name,
+                                help="Click to sort"
+                            )
+                
+                return display_df, column_config
+            
             # Marketplace Bar Chart with Stock Metrics
             if 'Maketplace' in filtered_df.columns:
                 st.markdown("### 📊 Marketplace Performance with Stock Metrics")
@@ -353,18 +395,24 @@ if uploaded_file is not None:
                     
                     # Marketplace data table with all metrics
                     with st.expander("📋 Marketplace Data Table with Stock Metrics"):
-                        # Create a display DataFrame with formatted values
-                        market_table = marketplace_data.copy()
-                        market_table_for_display = market_table.copy()
-                        market_table_for_display['SALES_QTY'] = market_table['SALES_QTY'].apply(lambda x: f"{x:,.0f}")
-                        market_table_for_display['OPENING_STOCK'] = market_table['OPENING_STOCK'].apply(lambda x: f"{x:,.0f}")
-                        market_table_for_display['SALES_PERCENTAGE'] = market_table['SALES_PERCENTAGE'].apply(lambda x: f"{x:.1f}%")
+                        # Prepare column mapping for display
+                        column_mapping = {
+                            'Marketplace': 'Marketplace',
+                            'SALES_QTY': 'Sales Qty',
+                            'OPENING_STOCK': 'Opening Stock',
+                            'SALES_PERCENTAGE': 'Sales %'
+                        }
                         
-                        # Rename columns for display
-                        market_table_for_display.columns = ['Marketplace', 'Sales Qty', 'Opening Stock', 'Sales %']
+                        # Create sortable dataframe
+                        display_df, column_config = create_sortable_dataframe(marketplace_data, column_mapping)
                         
-                        # Display the formatted table
-                        st.dataframe(market_table_for_display, hide_index=True, use_container_width=True)
+                        # Display with column configuration
+                        st.dataframe(
+                            display_df,
+                            column_config=column_config,
+                            hide_index=True,
+                            use_container_width=True
+                        )
                 
                 st.markdown("---")
             
@@ -401,26 +449,21 @@ if uploaded_file is not None:
                                 category_data = analyze_with_stock(filtered_df, col_name, display_name)
                                 
                                 if not category_data.empty:
-                                    # Create two dataframes: one for sorting, one for display
-                                    sortable_table = category_data.copy()
-                                    sortable_table.columns = [display_name, 'SALES_QTY', 'OPENING_STOCK', 'SALES_PERCENTAGE']
+                                    # Prepare column mapping for display
+                                    column_mapping = {
+                                        display_name: display_name,
+                                        'SALES_QTY': 'Sales Qty',
+                                        'OPENING_STOCK': 'Opening Stock',
+                                        'SALES_PERCENTAGE': 'Sales %'
+                                    }
                                     
-                                    # Create display table with formatted values
-                                    display_table = sortable_table.copy()
-                                    display_table['SALES_QTY'] = display_table['SALES_QTY'].apply(lambda x: f"{x:,.0f}")
-                                    display_table['OPENING_STOCK'] = display_table['OPENING_STOCK'].apply(lambda x: f"{x:,.0f}")
-                                    display_table['SALES_PERCENTAGE'] = display_table['SALES_PERCENTAGE'].apply(lambda x: f"{x:.1f}%")
+                                    # Create sortable dataframe
+                                    display_df, column_config = create_sortable_dataframe(category_data, column_mapping)
                                     
-                                    # Rename columns for display
-                                    display_table.columns = [display_name, 'Sales Qty', 'Opening Stock', 'Sales %']
-                                    
-                                    # Create a copy of the sortable table for actual sorting
-                                    sort_df = sortable_table.copy()
-                                    sort_df.columns = [display_name, 'Sales Qty_num', 'Opening Stock_num', 'Sales %_num']
-                                    
-                                    # Display table - Streamlit will handle sorting automatically
+                                    # Display with column configuration
                                     st.dataframe(
-                                        display_table,
+                                        display_df,
+                                        column_config=column_config,
                                         hide_index=True,
                                         use_container_width=True,
                                         height=300
@@ -499,17 +542,27 @@ if uploaded_file is not None:
             
             # Monthly data table with all metrics
             with st.expander("📋 Monthly Trend Data Table with Stock Metrics"):
-                # Create a display DataFrame with formatted values
+                # Create a copy for display
                 trend_table = monthly_data[['Period', 'SALES_QTY', 'OPENING_STOCK', 'SALES_PERCENTAGE']].copy()
-                trend_table_for_display = trend_table.copy()
-                trend_table_for_display['SALES_QTY'] = trend_table['SALES_QTY'].apply(lambda x: f"{x:,.0f}")
-                trend_table_for_display['OPENING_STOCK'] = trend_table['OPENING_STOCK'].apply(lambda x: f"{x:,.0f}")
-                trend_table_for_display['SALES_PERCENTAGE'] = trend_table['SALES_PERCENTAGE'].apply(lambda x: f"{x:.1f}%")
                 
-                # Rename columns for display
-                trend_table_for_display.columns = ['Period', 'Sales Quantity', 'Opening Stock', 'Sales %']
+                # Prepare column mapping for display
+                column_mapping = {
+                    'Period': 'Period',
+                    'SALES_QTY': 'Sales Quantity',
+                    'OPENING_STOCK': 'Opening Stock',
+                    'SALES_PERCENTAGE': 'Sales %'
+                }
                 
-                st.dataframe(trend_table_for_display, hide_index=True, use_container_width=True)
+                # Create sortable dataframe
+                display_df, column_config = create_sortable_dataframe(trend_table, column_mapping)
+                
+                # Display with column configuration
+                st.dataframe(
+                    display_df,
+                    column_config=column_config,
+                    hide_index=True,
+                    use_container_width=True
+                )
             
             st.markdown("---")
             
